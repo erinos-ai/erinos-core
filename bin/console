@@ -3,5 +3,4 @@
 
 require_relative "../config/application"
 
-user = Gateway.enter
-Erin.run(user: user)
+Console.new.run

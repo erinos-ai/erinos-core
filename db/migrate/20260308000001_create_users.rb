@@ -3,6 +3,7 @@ class CreateUsers < ActiveRecord::Migration[8.1]
     create_table :users do |t|
       t.string :name, null: false
       t.string :pin, null: false
+      t.bigint :telegram_id
       t.timestamps
     end
   end
