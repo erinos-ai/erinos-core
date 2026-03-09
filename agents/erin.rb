@@ -1,5 +1,5 @@
 class Erin < RubyLLM::Agent
-  model "gpt-oss:120b-cloud", provider: :ollama
+  model "qwen3.5:397b-cloud", provider: :ollama
   inputs :user
 
   tools do
@@ -7,6 +7,7 @@ class Erin < RubyLLM::Agent
     [
       AuthorizeProvider.new(user: user, registry: registry),
       CheckAuthorization.new(user: user),
+      ReadSkill.new(registry: registry),
       RunCommand.new(user: user, registry: registry)
     ]
   end
@@ -33,8 +34,12 @@ class Erin < RubyLLM::Agent
       entirely through the browser OAuth flow.
 
       ## Running commands
-      Use the run_command tool to execute CLI commands. Always specify the
-      provider so the user's credentials are injected automatically.
+      Before running any command, call read_skill first to learn the correct
+      syntax. Then use run_command to execute. Always specify the provider
+      so the user's credentials are injected automatically.
+
+      If a command fails, report the error to the user. Do NOT retry or try
+      alternative commands. One attempt per user request.
     PROMPT
   end
 end

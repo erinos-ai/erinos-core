@@ -5,8 +5,6 @@ description: "Google Drive: Manage files, folders, and shared drives."
 
 # drive (v3)
 
-> **PREREQUISITE:** Read `../gws-shared/SKILL.md` for auth, global flags, and security rules. If missing, run `gws generate-skills` to create it.
-
 ```bash
 gws drive <resource> <method> [flags]
 ```

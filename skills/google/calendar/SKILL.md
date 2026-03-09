@@ -5,8 +5,6 @@ description: "Google Calendar: Manage calendars and events."
 
 # calendar (v3)
 
-> **PREREQUISITE:** Read `../gws-shared/SKILL.md` for auth, global flags, and security rules. If missing, run `gws generate-skills` to create it.
-
 ```bash
 gws calendar <resource> <method> [flags]
 ```

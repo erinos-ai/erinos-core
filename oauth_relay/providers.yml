@@ -1,3 +1,12 @@
+spotify:
+  auth_url: https://accounts.spotify.com/authorize
+  token_url: https://accounts.spotify.com/api/token
+  scopes:
+    - user-read-playback-state
+    - user-modify-playback-state
+    - user-read-currently-playing
+    - user-read-recently-played
+
 google:
   auth_url: https://accounts.google.com/o/oauth2/v2/auth
   token_url: https://oauth2.googleapis.com/token

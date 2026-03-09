@@ -10,6 +10,22 @@ class Console
     puts "\n\e[32mWelcome, #{user.name}!\e[0m\n\n"
 
     chat = Erin.chat(user: user)
+    chat.on_tool_call do |tool_call|
+      args = tool_call.arguments
+      detail = case tool_call.name
+               when "read_skill" then args["skill"]
+               when "run_command" then args["command"]
+               when "authorize_provider" then args["provider"]
+               when "check_authorization" then args["provider"]
+               end
+      label = detail ? "#{tool_call.name}(#{detail})" : tool_call.name
+      print "\r\e[33m~ #{label}\e[0m\n"
+    end
+    chat.on_tool_result do |tool_call, result|
+      output = result.to_s
+      output = "#{output[0, 200]}..." if output.length > 200
+      print "\e[90m  => #{output}\e[0m\n"
+    end
 
     loop do
       print "\e[36myou>\e[0m "
@@ -91,6 +107,9 @@ class Console
     end
 
     puts "\n\n"
+  rescue RubyLLM::ContextLengthExceededError
+    spinner.kill
+    puts "\r\e[31mConversation too long. Please restart.\e[0m\n\n"
   end
 
   def start_spinner

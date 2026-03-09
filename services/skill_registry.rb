@@ -1,7 +1,9 @@
 require "yaml"
 
 class SkillRegistry
-  Skill = Data.define(:name, :description, :provider, :auth, :env, :path)
+  Skill = Data.define(:name, :description, :provider, :auth, :env, :path) do
+    def shared? = name.end_with?("-shared")
+  end
 
   def initialize(skills_dir: File.expand_path("../skills", __dir__))
     @skills_dir = skills_dir
@@ -26,7 +28,7 @@ class SkillRegistry
   end
 
   def catalog
-    @skills.values.group_by(&:provider).map do |provider, skills|
+    @skills.values.reject(&:shared?).group_by(&:provider).map do |provider, skills|
       lines = skills.map { |s| "  - #{s.name}: #{s.description}" }
       "#{provider}:\n#{lines.join("\n")}"
     end.join("\n\n")
@@ -36,11 +38,17 @@ class SkillRegistry
     skill = find_skill(name)
     return nil unless skill
 
-    content = File.read(skill.path)
-    content.sub(/\A---\n.*?^---\n/m, "").strip
+    body = read_body(skill.path)
+    shared = @skills.values.find { |s| s.provider == skill.provider && s.shared? }
+    shared && !skill.shared? ? "#{read_body(shared.path)}\n\n---\n\n#{body}" : body
   end
 
   private
+
+  def read_body(path)
+    content = File.read(path)
+    content.sub(/\A---\n.*?^---\n/m, "").strip
+  end
 
   def load_all
     Dir[File.join(@skills_dir, "*/provider.yml")].each do |provider_path|

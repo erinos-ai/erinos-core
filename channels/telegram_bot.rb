@@ -64,6 +64,12 @@ class TelegramBot
       chat_id: message.chat.id,
       text: response.content
     )
+  rescue RubyLLM::ContextLengthExceededError
+    @chats.delete(user.id)
+    bot.api.send_message(
+      chat_id: message.chat.id,
+      text: "Our conversation got too long, so I've started a fresh one. Please try again."
+    )
   end
 
   def chat_for(user)
