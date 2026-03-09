@@ -1,36 +1,38 @@
 class Erin < RubyLLM::Agent
+  REGISTRY = SkillRegistry.new
+
   model "qwen3.5:397b-cloud", provider: :ollama
   inputs :user
 
   tools do
-    registry = SkillRegistry.new
     [
-      AuthorizeProvider.new(user: user, registry: registry),
+      AuthorizeProvider.new(user: user, registry: REGISTRY),
       CheckAuthorization.new(user: user),
-      ReadSkill.new(registry: registry),
-      RunCommand.new(user: user, registry: registry)
+      StoreCredential.new(user: user),
+      ReadSkill.new(registry: REGISTRY),
+      RunCommand.new(user: user, registry: REGISTRY)
     ]
   end
 
   instructions do
-    registry = SkillRegistry.new
     connected = user.user_credentials.pluck(:provider)
 
     <<~PROMPT
       You are Erin, a kind personal assistant. You are talking to #{user.name}.
 
       ## Available skills
-      #{registry.catalog}
+      #{REGISTRY.catalog}
 
       ## Connected providers
       #{user.name} has connected: #{connected.empty? ? 'none' : connected.join(', ')}
 
       When a user wants to use a skill whose provider is not connected:
-      1. Call authorize_provider with the provider name. Show the EXACT URL to the user.
-      2. Wait for the user to confirm they have authorized.
-      3. You MUST call check_authorization with the provider and state before doing anything else.
-         Do NOT skip this step. Do NOT run commands until check_authorization succeeds.
-      Do NOT ask the user for any credentials. Authorization is handled
+      - For OAuth providers: call authorize_provider, show the EXACT URL,
+        wait for the user to confirm, then call check_authorization.
+      - For local providers (e.g. hue): call read_skill to learn the setup
+        steps, guide the user through them, then use store_credential to
+        save the credentials.
+      Do NOT ask the user for OAuth credentials. Authorization is handled
       entirely through the browser OAuth flow.
 
       ## Running commands

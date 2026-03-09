@@ -28,8 +28,7 @@ class RunCommand < RubyLLM::Tool
 
       refresh_if_expired!(credential, provider) if skill.auth["type"] == "oauth"
 
-      connector = connector_for(skill.auth["type"])
-      env = connector.env_for(credential.data, env_mapping: skill.env)
+      skill.env.each { |env_var, field| env[env_var] = credential.data[field] }
     end
 
     output, status = Open3.capture2e(env, command)
@@ -61,12 +60,5 @@ class RunCommand < RubyLLM::Tool
       "access_token" => body["access_token"],
       "token_expires_at" => (Time.now + body["expires_in"].to_i).iso8601
     ))
-  end
-
-  def connector_for(type)
-    case type
-    when "oauth" then Connectors::Oauth
-    else raise "Unknown connector type: #{type}"
-    end
   end
 end
