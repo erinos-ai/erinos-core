@@ -1,0 +1,4 @@
+auth:
+  type: oauth
+env:
+  GOOGLE_WORKSPACE_CLI_TOKEN: access_token
