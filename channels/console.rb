@@ -1,5 +1,7 @@
 require "io/console"
 
+$stdout.sync = true
+
 class Console
   SPINNER_FRAMES = %w[⠋ ⠙ ⠹ ⠸ ⠼ ⠴ ⠦ ⠧ ⠇ ⠏].freeze
 
@@ -120,6 +122,7 @@ class Console
       i = 0
       loop do
         print "\r\e[K\e[33m#{SPINNER_FRAMES[i % SPINNER_FRAMES.length]} #{@spinner_label}\e[0m"
+        $stdout.flush
         sleep 0.1
         i += 1
       end
