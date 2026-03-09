@@ -11,20 +11,18 @@ class Console
 
     chat = Erin.chat(user: user)
     chat.on_tool_call do |tool_call|
-      args = tool_call.arguments
-      detail = case tool_call.name
-               when "read_skill" then args["skill"]
-               when "run_command" then args["command"]
-               when "authorize_provider" then args["provider"]
-               when "check_authorization" then args["provider"]
-               end
-      label = detail ? "#{tool_call.name}(#{detail})" : tool_call.name
-      print "\r\e[33m~ #{label}\e[0m\n"
-    end
-    chat.on_tool_result do |tool_call, result|
-      output = result.to_s
-      output = "#{output[0, 200]}..." if output.length > 200
-      print "\e[90m  => #{output}\e[0m\n"
+      label = case tool_call.name
+              when "read_skill" then tool_call.arguments["skill"]
+              when "run_command" then tool_call.arguments["provider"] || "command"
+              when "authorize_provider", "check_authorization" then tool_call.arguments["provider"]
+              when "store_credential" then tool_call.arguments["provider"]
+              else tool_call.name
+              end
+      @spinner_label = label
+      unless @streaming
+        @spinner&.kill
+        @spinner = start_spinner
+      end
     end
 
     loop do
@@ -94,13 +92,18 @@ class Console
   end
 
   def respond(chat, input)
-    spinner = start_spinner
+    @spinner_label = "thinking"
+    @streaming = false
+    @spinner = start_spinner
 
     first_chunk = true
     chat.ask(input) do |chunk|
+      next if chunk.content.nil? || chunk.content.empty?
+
       if first_chunk
-        spinner.kill
-        print "\r\e[35merin>\e[0m "
+        @streaming = true
+        @spinner&.kill
+        print "\r\e[K\e[35merin>\e[0m "
         first_chunk = false
       end
       print chunk.content
@@ -108,15 +111,15 @@ class Console
 
     puts "\n\n"
   rescue RubyLLM::ContextLengthExceededError
-    spinner.kill
-    puts "\r\e[31mConversation too long. Please restart.\e[0m\n\n"
+    @spinner&.kill
+    puts "\r\e[K\e[31mConversation too long. Please restart.\e[0m\n\n"
   end
 
   def start_spinner
     Thread.new do
       i = 0
       loop do
-        print "\r\e[33m#{SPINNER_FRAMES[i % SPINNER_FRAMES.length]} thinking...\e[0m"
+        print "\r\e[K\e[33m#{SPINNER_FRAMES[i % SPINNER_FRAMES.length]} #{@spinner_label}\e[0m"
         sleep 0.1
         i += 1
       end
