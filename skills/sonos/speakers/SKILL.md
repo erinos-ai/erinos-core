@@ -1,23 +1,13 @@
 ---
 name: sonos-speakers
-description: "Sonos: Discover speakers and groups — list, wake, volume."
+description: "Sonos: Manage speakers — volume, grouping, playback status."
 ---
 
 # Sonos Speakers
 
-Discover and manage Sonos speakers via the Sonos Control API using curl. The access token is available as `$SONOS_ACCESS_TOKEN`.
+Manage Sonos speakers via the Sonos Control API using curl. The access token is available as `$SONOS_ACCESS_TOKEN`.
 
 Base URL: `https://api.ws.sonos.com/control/api/v1`
-
-## Important
-
-Calling the Sonos API wakes speakers, making them visible to Spotify Connect.
-When the user wants to redirect Spotify playback to Sonos speakers:
-
-1. Call **list groups** (below) to wake speakers and learn their names
-2. Call **Spotify get devices** — the Sonos speakers should now appear
-3. Match the speaker name from Sonos to the Spotify device list
-4. Transfer playback via Spotify
 
 ## Common Headers
 
@@ -75,4 +65,26 @@ curl -s -X POST -H "Authorization: Bearer $SONOS_ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"volume": 50}' \
   "https://api.ws.sonos.com/control/api/v1/players/PLAYER_ID/playerVolume"
+```
+
+### Group speakers
+
+Create a new group by joining players to a coordinator:
+
+```bash
+curl -s -X POST -H "Authorization: Bearer $SONOS_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"playerIdsToAdd": ["PLAYER_ID_1", "PLAYER_ID_2"]}' \
+  "https://api.ws.sonos.com/control/api/v1/groups/GROUP_ID/groups/modifyGroupMembers"
+```
+
+### Ungroup speakers
+
+Remove players from a group:
+
+```bash
+curl -s -X POST -H "Authorization: Bearer $SONOS_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"playerIdsToRemove": ["PLAYER_ID"]}' \
+  "https://api.ws.sonos.com/control/api/v1/groups/GROUP_ID/groups/modifyGroupMembers"
 ```
