@@ -86,6 +86,31 @@ class Api < Sinatra::Base
     json(error: e.message)
   end
 
+  post "/api/voice" do
+    user = current_user
+    audio = params[:file]
+    halt 400, json(error: "audio file required") unless audio
+
+    # STT: whisper
+    text = transcribe(audio[:tempfile])
+    halt 400, json(error: "could not transcribe audio") if text.nil? || text.strip.empty?
+
+    # Chat: Erin
+    chat = chat_for(user)
+    response = chat.ask(text)
+
+    # TTS: Kokoro
+    audio_data = synthesize(response.content)
+    halt 502, json(error: "TTS failed") unless audio_data
+
+    content_type "audio/wav"
+    audio_data
+  rescue RubyLLM::ContextLengthExceededError
+    CHAT_MUTEX.synchronize { CHATS.delete(user.id) }
+    status 400
+    json(error: "context_length_exceeded")
+  end
+
   get "/api/auth/me" do
     user = current_user
     json(user: { id: user.id, name: user.name })
@@ -100,5 +125,54 @@ class Api < Sinatra::Base
   def json(data)
     content_type :json
     data.to_json
+  end
+
+  def transcribe(audio_file)
+    whisper_url = ENV.fetch("WHISPER_URL", "http://localhost:8080")
+    uri = URI("#{whisper_url}/inference")
+
+    boundary = SecureRandom.hex
+    body = build_multipart(boundary, audio_file)
+
+    req = Net::HTTP::Post.new(uri)
+    req["Content-Type"] = "multipart/form-data; boundary=#{boundary}"
+    req.body = body
+
+    response = Net::HTTP.start(uri.hostname, uri.port, read_timeout: 120) { |http| http.request(req) }
+    result = JSON.parse(response.body)
+    result["text"]
+  end
+
+  def synthesize(text)
+    kokoro_url = ENV.fetch("KOKORO_URL", "http://localhost:8880")
+    voice = ENV.fetch("KOKORO_VOICE", "if_sara")
+    uri = URI("#{kokoro_url}/v1/audio/speech")
+
+    req = Net::HTTP::Post.new(uri)
+    req["Content-Type"] = "application/json"
+    req.body = JSON.generate(
+      model: "kokoro",
+      input: text,
+      voice: voice,
+      response_format: "wav"
+    )
+
+    response = Net::HTTP.start(uri.hostname, uri.port, read_timeout: 120) { |http| http.request(req) }
+    return nil unless response.code == "200"
+    response.body
+  end
+
+  def build_multipart(boundary, file)
+    file.rewind
+    data = file.read
+
+    "--#{boundary}\r\n" \
+    "Content-Disposition: form-data; name=\"file\"; filename=\"audio.wav\"\r\n" \
+    "Content-Type: audio/wav\r\n\r\n" \
+    "#{data}\r\n" \
+    "--#{boundary}\r\n" \
+    "Content-Disposition: form-data; name=\"response_format\"\r\n\r\n" \
+    "json\r\n" \
+    "--#{boundary}--\r\n"
   end
 end
