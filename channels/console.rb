@@ -11,13 +11,14 @@ class Console
 
     puts "\n\e[32mWelcome, #{user.name}!\e[0m\n\n"
 
-    chat = Erin.chat(user: user)
+    chat = Erin.chat(user: user, channel: "console")
     chat.on_tool_call do |tool_call|
       label = case tool_call.name
               when "read_skill" then tool_call.arguments["skill"]
               when "run_command" then tool_call.arguments["provider"] || "command"
               when "authorize_provider", "check_authorization" then tool_call.arguments["provider"]
               when "store_credential" then tool_call.arguments["provider"]
+              when "manage_schedule" then tool_call.arguments["action"]
               else tool_call.name
               end
       @spinner_label = label

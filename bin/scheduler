@@ -1,0 +1,24 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../config/application"
+
+puts "Starting scheduler..."
+
+loop do
+  Schedule.where("next_run_at <= ? AND active = ?", Time.now, true).find_each do |schedule|
+    puts "[scheduler] Firing schedule ##{schedule.id} for #{schedule.user.name}: #{schedule.prompt}"
+
+    begin
+      chat = Erin.chat(user: schedule.user, channel: schedule.channel)
+      response = chat.ask(schedule.prompt)
+      Notifier.send(user: schedule.user, channel: schedule.channel, text: response.content)
+    rescue => e
+      puts "[scheduler] Error on schedule ##{schedule.id}: #{e.message}"
+    end
+
+    schedule.advance!
+  end
+
+  sleep 30
+end

@@ -1,8 +1,8 @@
 class Erin < RubyLLM::Agent
   REGISTRY = SkillRegistry.new
 
-  model "qwen3.5:397b-cloud", provider: :ollama
-  inputs :user
+  model "qwen3.5:cloud", provider: :ollama
+  inputs :user, :channel
 
   tools do
     [
@@ -10,7 +10,8 @@ class Erin < RubyLLM::Agent
       CheckAuthorization.new(user: user),
       StoreCredential.new(user: user),
       ReadSkill.new(registry: REGISTRY),
-      RunCommand.new(user: user, registry: REGISTRY)
+      RunCommand.new(user: user, registry: REGISTRY),
+      ManageSchedule.new(user: user, channel: channel)
     ]
   end
 
@@ -42,6 +43,15 @@ class Erin < RubyLLM::Agent
 
       If a command fails, report the error to the user. Do NOT retry or try
       alternative commands. One attempt per user request.
+
+      ## Scheduling
+      Current time: #{Time.now.strftime('%Y-%m-%dT%H:%M:%S%z')}
+
+      You can create schedules for the user using manage_schedule. Translate
+      natural language time expressions into cron expressions (e.g. "every
+      morning at 8am" → "0 8 * * *", "every Sunday at 10am" → "0 10 * * 0").
+      For one-off tasks, use run_at with an ISO 8601 datetime including
+      timezone offset (e.g. "2026-03-10T09:00:00+01:00").
     PROMPT
   end
 end

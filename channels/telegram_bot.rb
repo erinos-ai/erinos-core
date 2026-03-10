@@ -73,6 +73,6 @@ class TelegramBot
   end
 
   def chat_for(user)
-    @chats[user.id] ||= Erin.chat(user: user)
+    @chats[user.id] ||= Erin.chat(user: user, channel: "telegram")
   end
 end
