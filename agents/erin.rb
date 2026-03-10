@@ -1,7 +1,7 @@
 class Erin < RubyLLM::Agent
   REGISTRY = SkillRegistry.new
 
-  model "qwen3.5:cloud", provider: :ollama
+  model ENV.fetch("ERIN_MODEL"), provider: ENV.fetch("ERIN_PROVIDER").to_sym
   inputs :user, :channel
 
   tools do

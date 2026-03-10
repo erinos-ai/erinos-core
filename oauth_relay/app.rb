@@ -40,18 +40,20 @@ class OauthRelay < Sinatra::Base
       client_id: client_id,
       client_secret: client_secret,
       token_url: config["token_url"],
+      token_auth: config["token_auth"],
       created_at: Time.now
     }
 
-    params = URI.encode_www_form(
+    auth_params = {
       client_id: client_id,
       redirect_uri: "#{request.base_url}/callback",
       response_type: "code",
       scope: config["scopes"].join(" "),
-      state: state,
-      access_type: "offline",
-      prompt: "consent"
-    )
+      state: state
+    }
+    auth_params.merge!(config["extra_params"]) if config["extra_params"]
+
+    params = URI.encode_www_form(auth_params)
 
     cleanup_expired
     json(url: "#{config['auth_url']}?#{params}")
@@ -150,15 +152,10 @@ class OauthRelay < Sinatra::Base
       return json(error: "No credentials configured for provider: #{provider}")
     end
 
-    uri = URI(config["token_url"])
-    response = Net::HTTP.post_form(uri, {
-      client_id: client_id,
-      client_secret: client_secret,
+    tokens = token_post(config["token_url"], client_id, client_secret, config["token_auth"], {
       refresh_token: body["refresh_token"],
       grant_type: "refresh_token"
     })
-
-    tokens = JSON.parse(response.body)
 
     if tokens["error"]
       status 400
@@ -183,14 +180,24 @@ class OauthRelay < Sinatra::Base
   end
 
   def exchange_code(session, code, redirect_uri)
-    uri = URI(session[:token_url])
-    response = Net::HTTP.post_form(uri, {
+    token_post(session[:token_url], session[:client_id], session[:client_secret], session[:token_auth], {
       code: code,
-      client_id: session[:client_id],
-      client_secret: session[:client_secret],
       redirect_uri: redirect_uri,
       grant_type: "authorization_code"
     })
+  end
+
+  def token_post(url, client_id, client_secret, token_auth, form_data)
+    uri = URI(url)
+
+    if token_auth == "basic"
+      req = Net::HTTP::Post.new(uri)
+      req.basic_auth(client_id, client_secret)
+      req.set_form_data(form_data)
+      response = Net::HTTP.start(uri.hostname, uri.port, use_ssl: true) { |http| http.request(req) }
+    else
+      response = Net::HTTP.post_form(uri, form_data.merge(client_id: client_id, client_secret: client_secret))
+    end
 
     JSON.parse(response.body)
   end
