@@ -7,7 +7,6 @@ require "open3"
 
 loader = Zeitwerk::Loader.new
 loader.push_dir(File.expand_path("../agents", __dir__))
-loader.push_dir(File.expand_path("../api", __dir__))
 loader.push_dir(File.expand_path("../channels", __dir__))
 loader.push_dir(File.expand_path("../entities", __dir__))
 loader.push_dir(File.expand_path("../services", __dir__))
