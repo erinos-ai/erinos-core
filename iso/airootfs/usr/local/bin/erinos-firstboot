@@ -15,8 +15,8 @@ export HOME="${HOME:-/root}"
 ENV_FILE="/opt/erinos/.env"
 source "$ENV_FILE" 2>/dev/null || true
 
-MODEL_PROVIDER="${MODEL_PROVIDER:-ollama}"
-MODEL_NAME="${MODEL_NAME:-}"
+ERIN_PROVIDER="${ERIN_PROVIDER:-ollama}"
+ERIN_MODEL="${ERIN_MODEL:-}"
 
 # ── Wait for DNS ─────────────────────────────────────────────────────
 progress "Waiting for network..."
@@ -26,7 +26,7 @@ for _ in $(seq 1 60); do
 done
 
 # ── Pull Ollama model ────────────────────────────────────────────────
-if [[ "$MODEL_PROVIDER" == "ollama" && -n "$MODEL_NAME" ]]; then
+if [[ "$ERIN_PROVIDER" == "ollama" && -n "$ERIN_MODEL" ]]; then
   progress "Waiting for Ollama..."
   for _ in $(seq 1 60); do
     ollama list &>/dev/null && break
@@ -35,7 +35,7 @@ if [[ "$MODEL_PROVIDER" == "ollama" && -n "$MODEL_NAME" ]]; then
 
   START=$SECONDS
   for attempt in $(seq 1 5); do
-    ollama pull "$MODEL_NAME" >>"$LOG" 2>&1 &
+    ollama pull "$ERIN_MODEL" >>"$LOG" 2>&1 &
     PID=$!
     while kill -0 $PID 2>/dev/null; do
       ELAPSED=$(( SECONDS - START ))
