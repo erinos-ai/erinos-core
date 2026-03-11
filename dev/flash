@@ -1,0 +1,131 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Downloads the latest ErinOS ISO from GitHub Actions, flashes it to a USB drive,
+# and copies a .env config file to the USB for the installer to pick up.
+# Requires: gh (GitHub CLI)
+
+REPO="fconforti/erinos"
+PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+ISO_PATH="/tmp/erinos.iso"
+ENV_PATH="/tmp/erinos-env"
+
+echo "Fetching latest ISO from GitHub Actions..."
+
+RUN_ID=$(gh run list --repo "$REPO" --workflow build-iso.yml --status success --limit 1 --json databaseId --jq '.[0].databaseId')
+if [[ -z "$RUN_ID" ]]; then
+  echo "No successful build found."
+  exit 1
+fi
+
+ARTIFACT_NAME=$(gh api "repos/${REPO}/actions/runs/${RUN_ID}/artifacts" --jq '.artifacts[0].name')
+echo "Downloading artifact '${ARTIFACT_NAME}' from run #${RUN_ID}..."
+rm -rf /tmp/erinos-iso
+gh run download "$RUN_ID" --repo "$REPO" --name "$ARTIFACT_NAME" --dir /tmp/erinos-iso
+mv /tmp/erinos-iso/erinos.iso "$ISO_PATH"
+rm -rf /tmp/erinos-iso
+echo "Downloaded: ${ISO_PATH}"
+
+# Prepare .env for editing: start from .env.example, overlay values from .env
+cp "$PROJECT_ROOT/.env.example" "$ENV_PATH"
+if [[ -f "$PROJECT_ROOT/.env" ]]; then
+  while IFS='=' read -r key value; do
+    [[ -z "$key" || "$key" == \#* ]] && continue
+    # Replace the key's line in the template with the actual value
+    if grep -q "^${key}=" "$ENV_PATH"; then
+      sed -i '' "s|^${key}=.*|${key}=${value}|" "$ENV_PATH"
+    elif grep -q "^# ${key}=" "$ENV_PATH"; then
+      sed -i '' "s|^# ${key}=.*|${key}=${value}|" "$ENV_PATH"
+    else
+      echo "${key}=${value}" >> "$ENV_PATH"
+    fi
+  done < "$PROJECT_ROOT/.env"
+fi
+
+echo ""
+echo "Opening configuration for editing..."
+echo "Fill in your values, save, and close the editor."
+"${EDITOR:-nano}" "$ENV_PATH"
+
+# Select target disk
+echo ""
+echo "Available disks:"
+if [[ "$(uname)" == "Darwin" ]]; then
+  diskutil list external physical
+else
+  lsblk -d -o NAME,SIZE,MODEL -n | grep -v "^loop\|^sr\|^ram"
+fi
+
+echo ""
+read -rp "Target disk (e.g. disk4 or sdb): " DISK_NAME
+DISK="/dev/${DISK_NAME}"
+
+if [[ ! -b "$DISK" ]] && [[ ! -b "/dev/r${DISK_NAME}" ]]; then
+  echo "Disk not found: ${DISK}"
+  exit 1
+fi
+
+echo ""
+echo "WARNING: This will ERASE ${DISK} and write the ErinOS installer ISO."
+read -rp "Type YES to confirm: " CONFIRM
+if [[ "$CONFIRM" != "YES" ]]; then
+  rm -f "$ENV_PATH"
+  echo "Aborted."
+  exit 0
+fi
+
+# Pre-authenticate sudo before any progress bars
+sudo true
+
+# Flash ISO
+echo "Flashing..."
+if [[ "$(uname)" == "Darwin" ]]; then
+  diskutil unmountDisk "$DISK"
+  if command -v pv &>/dev/null; then
+    pv "$ISO_PATH" | sudo dd of="/dev/r${DISK_NAME}" bs=4m 2>/dev/null
+  else
+    echo "(install pv for a progress bar: brew install pv)"
+    sudo dd if="$ISO_PATH" of="/dev/r${DISK_NAME}" bs=4m 2>&1
+  fi
+else
+  sudo umount "${DISK}"* 2>/dev/null || true
+  if command -v pv &>/dev/null; then
+    pv "$ISO_PATH" | sudo dd of="$DISK" bs=4M oflag=sync 2>/dev/null
+  else
+    sudo dd if="$ISO_PATH" of="$DISK" bs=4M status=progress oflag=sync
+  fi
+  sync
+fi
+echo "ISO written."
+
+# Copy .env to the ISO's existing EFI partition
+echo "Writing configuration..."
+sleep 1
+if [[ "$(uname)" == "Darwin" ]]; then
+  # The archiso EFI partition is partition 2 (s2)
+  EFI_PART="/dev/${DISK_NAME}s2"
+  diskutil mount "$EFI_PART" >/dev/null 2>&1
+  EFI_MNT=$(diskutil info "$EFI_PART" | grep 'Mount Point' | sed 's/.*: *//')
+else
+  # On Linux, the EFI partition is typically the second partition
+  EFI_PART="${DISK}2"
+  [[ "$DISK" == *"nvme"* || "$DISK" == *"mmcblk"* ]] && EFI_PART="${DISK}p2"
+  EFI_MNT=$(mktemp -d)
+  sudo mount "$EFI_PART" "$EFI_MNT"
+fi
+
+sudo mkdir -p "$EFI_MNT/erinos"
+sudo cp "$ENV_PATH" "$EFI_MNT/erinos/.env"
+rm -f "$ENV_PATH"
+
+if [[ "$(uname)" == "Darwin" ]]; then
+  diskutil unmount "$EFI_PART" >/dev/null 2>&1
+  diskutil eject "$DISK"
+else
+  sudo umount "$EFI_MNT"
+  rmdir "$EFI_MNT"
+fi
+
+echo "Configuration written."
+echo ""
+echo "Done. USB drive is ready."

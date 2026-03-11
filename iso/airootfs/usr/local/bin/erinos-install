@@ -113,8 +113,8 @@ _do_install() {
   bash -c 'yes "" | pacstrap -K /mnt \
       base linux linux-firmware amd-ucode \
       networkmanager openssh tmux avahi nss-mdns \
-      ruby sqlite ffmpeg git \
-      base-devel cmake \
+      sqlite ffmpeg git \
+      base-devel openssl libyaml libffi zlib \
       ollama-rocm \
       gum jq' >/tmp/pacstrap.log 2>&1 &
   PID=$!
@@ -164,29 +164,14 @@ _do_install() {
   cp /usr/local/bin/erinos-console /mnt/usr/local/bin/erinos-console
   chmod 755 /mnt/usr/local/bin/erinos-firstboot /mnt/usr/local/bin/erinos-console
 
-  # Load config from USB EFI partition (user pre-configured before install)
+  # Load .env from USB config partition
   USB_ENV_LOADED=false
   for part in $(blkid -t TYPE=vfat -o device 2>/dev/null); do
     [[ "$part" == "${PART1}" ]] && continue
     USB_MNT=$(mktemp -d)
     if mount -o ro "$part" "$USB_MNT" 2>/dev/null; then
-      if [[ -f "$USB_MNT/erinos/env.yml" ]]; then
-        awk '
-          /^#/ || /^[[:space:]]*$/ { next }
-          /^[a-z][a-z_]*:[[:space:]]*$/ { section=$0; sub(/:.*/, "", section); next }
-          /^[a-z]/ { key=$0; val=$0; sub(/:.*/, "", key); sub(/^[^:]*:[[:space:]]*/, "", val); gsub(/"/, "", val); print toupper(key) "=" val; next }
-          /^[[:space:]]/ { line=$0; sub(/^[[:space:]]+/, "", line); key=line; val=line; sub(/:.*/, "", key); sub(/^[^:]*:[[:space:]]*/, "", val); gsub(/"/, "", val); if (section=="system") print toupper(key) "=" val; else print toupper(section "_" key) "=" val }
-        ' "$USB_MNT/erinos/env.yml" > /mnt/opt/erinos/.env
-        sed -i '/=$/d' /mnt/opt/erinos/.env
-        cat >> /mnt/opt/erinos/.env <<ENVDEFAULTS
-OLLAMA_API_BASE=http://localhost:11434/v1
-WHISPER_URL=http://localhost:8080
-ENVDEFAULTS
-        # Derive OAUTH_RELAY_URL from NGROK_DOMAIN
-        NGROK_DOMAIN=$(grep '^NGROK_DOMAIN=' /mnt/opt/erinos/.env | cut -d= -f2)
-        if [[ -n "$NGROK_DOMAIN" ]]; then
-          echo "OAUTH_RELAY_URL=https://${NGROK_DOMAIN}" >> /mnt/opt/erinos/.env
-        fi
+      if [[ -f "$USB_MNT/erinos/.env" ]]; then
+        cp "$USB_MNT/erinos/.env" /mnt/opt/erinos/.env
         chmod 600 /mnt/opt/erinos/.env
         USB_ENV_LOADED=true
         ok "Configuration loaded from USB"
@@ -200,7 +185,7 @@ ENVDEFAULTS
   done
 
   if [[ "$USB_ENV_LOADED" != true ]]; then
-    warn "No env.yml found on USB — you can create /opt/erinos/.env manually after boot"
+    warn "No .env found on USB — you can create /opt/erinos/.env manually after boot"
   fi
 }
 try_step "Installing base system" _do_install
@@ -284,17 +269,37 @@ mkinitcpio -P
 # System user
 useradd -r -m -d /opt/erinos -s /bin/bash erinos
 
+# Install rbenv + ruby-build
+su - erinos -c '
+  git clone https://github.com/rbenv/rbenv.git ~/.rbenv
+  git clone https://github.com/rbenv/ruby-build.git ~/.rbenv/plugins/ruby-build
+  echo "export PATH=\\\$HOME/.rbenv/bin:\\\$HOME/.rbenv/shims:\\\$PATH" >> ~/.bash_profile
+  echo "eval \\\"\\\$(rbenv init -)\\\"" >> ~/.bash_profile
+'
+
+# Build Ruby 4.0.0 (no YJIT — skips Rust dependency)
+su - erinos -c '
+  export PATH=\$HOME/.rbenv/bin:\$PATH
+  eval "\$(rbenv init -)"
+  RUBY_CONFIGURE_OPTS="--disable-yjit" rbenv install 4.0.0
+  rbenv global 4.0.0
+'
+
 # CLI wrapper
 cat > /usr/local/bin/erinos <<'WRAPPER'
 #!/usr/bin/env bash
+export PATH=/opt/erinos/.rbenv/bin:/opt/erinos/.rbenv/shims:\$PATH
 cd /opt/erinos && exec bundle exec bin/erinos "\$@"
 WRAPPER
 chmod 755 /usr/local/bin/erinos
 chown -R erinos: /opt/erinos
 
 # Bundle install
-gem install --no-user-install bundler
-su - erinos -c "cd /opt/erinos && bundle config set --local path vendor/bundle && bundle install"
+su - erinos -c '
+  export PATH=\$HOME/.rbenv/bin:\$HOME/.rbenv/shims:\$PATH
+  eval "\$(rbenv init -)"
+  cd /opt/erinos && bundle config set --local path vendor/bundle && bundle install
+'
 
 # Create models directory
 mkdir -p /opt/erinos/models
