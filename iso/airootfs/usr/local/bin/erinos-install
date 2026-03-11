@@ -268,38 +268,32 @@ mkinitcpio -P
 
 # System user
 useradd -r -m -d /opt/erinos -s /bin/bash erinos
+chown -R erinos: /opt/erinos
+
+# rbenv profile
+cat > /opt/erinos/.bash_profile <<'PROFILE'
+export PATH="$HOME/.rbenv/bin:$HOME/.rbenv/shims:$PATH"
+eval "$(rbenv init -)"
+PROFILE
+chown erinos: /opt/erinos/.bash_profile
 
 # Install rbenv + ruby-build
-su - erinos -c '
-  git clone https://github.com/rbenv/rbenv.git ~/.rbenv
-  git clone https://github.com/rbenv/ruby-build.git ~/.rbenv/plugins/ruby-build
-  echo "export PATH=\\\$HOME/.rbenv/bin:\\\$HOME/.rbenv/shims:\\\$PATH" >> ~/.bash_profile
-  echo "eval \\\"\\\$(rbenv init -)\\\"" >> ~/.bash_profile
-'
+su - erinos -c 'git clone https://github.com/rbenv/rbenv.git ~/.rbenv'
+su - erinos -c 'git clone https://github.com/rbenv/ruby-build.git ~/.rbenv/plugins/ruby-build'
 
 # Build Ruby 4.0.0 (no YJIT — skips Rust dependency)
-su - erinos -c '
-  export PATH=\$HOME/.rbenv/bin:\$PATH
-  eval "\$(rbenv init -)"
-  RUBY_CONFIGURE_OPTS="--disable-yjit" rbenv install 4.0.0
-  rbenv global 4.0.0
-'
+su - erinos -c 'RUBY_CONFIGURE_OPTS="--disable-yjit" rbenv install 4.0.0 && rbenv global 4.0.0'
 
 # CLI wrapper
 cat > /usr/local/bin/erinos <<'WRAPPER'
 #!/usr/bin/env bash
-export PATH=/opt/erinos/.rbenv/bin:/opt/erinos/.rbenv/shims:\$PATH
-cd /opt/erinos && exec bundle exec bin/erinos "\$@"
+export PATH="/opt/erinos/.rbenv/bin:/opt/erinos/.rbenv/shims:$PATH"
+cd /opt/erinos && exec bundle exec bin/erinos "$@"
 WRAPPER
 chmod 755 /usr/local/bin/erinos
-chown -R erinos: /opt/erinos
 
 # Bundle install
-su - erinos -c '
-  export PATH=\$HOME/.rbenv/bin:\$HOME/.rbenv/shims:\$PATH
-  eval "\$(rbenv init -)"
-  cd /opt/erinos && bundle config set --local path vendor/bundle && bundle install
-'
+su - erinos -c 'cd /opt/erinos && bundle config set --local path vendor/bundle && bundle install'
 
 # Create models directory
 mkdir -p /opt/erinos/models
