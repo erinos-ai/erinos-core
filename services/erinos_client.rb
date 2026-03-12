@@ -45,7 +45,7 @@ class ErinosClient
   end
 
   def voice(file_path)
-    uri = URI("#{@base_url}/api/voice")
+    uri = URI("#{@base_url}/api/chat")
     boundary = SecureRandom.hex
 
     file_data = File.binread(file_path)

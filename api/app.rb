@@ -2,7 +2,6 @@
 
 require_relative "routes/auth"
 require_relative "routes/chat"
-require_relative "routes/voice"
 
 class App < Sinatra::Base
   set :server, :puma
@@ -89,7 +88,6 @@ class App < Sinatra::Base
 
   register Routes::Auth
   register Routes::Chat
-  register Routes::Voice
 
   get "/health" do
     json(status: "ok")

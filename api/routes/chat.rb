@@ -3,13 +3,10 @@ module Routes
     def self.registered(app)
       app.post "/api/chat" do
         user = current_user
-        body = JSON.parse(request.body.read)
-        message = body["message"]
-        halt 400, json(error: "message required") unless message&.strip&.length&.positive?
-
+        text = extract_message
         chat = chat_for(user)
-        response = chat.ask(message)
-        json(response: response.content)
+        response = chat.ask(text)
+        respond_with(response.content)
       rescue RubyLLM::ContextLengthExceededError
         handle_context_overflow(user)
       end
@@ -41,6 +38,32 @@ module Routes
         end
       rescue RubyLLM::ContextLengthExceededError
         handle_context_overflow(user)
+      end
+
+      app.helpers do
+        def extract_message
+          if params[:file]
+            text = transcribe(params[:file][:tempfile])
+            halt 400, json(error: "could not transcribe audio") if text.nil? || text.strip.empty?
+            text
+          else
+            body = JSON.parse(request.body.read)
+            text = body["message"]
+            halt 400, json(error: "message required") unless text&.strip&.length&.positive?
+            text
+          end
+        end
+
+        def respond_with(text)
+          if params[:file] || request.env["HTTP_ACCEPT"]&.include?("audio/wav")
+            audio_data = synthesize(text)
+            halt 502, json(error: "TTS failed") unless audio_data
+            content_type "audio/wav"
+            audio_data
+          else
+            json(response: text)
+          end
+        end
       end
     end
   end

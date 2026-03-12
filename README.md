@@ -1,6 +1,6 @@
 # ErinOS
 
-ErinOS is a local-first AI assistant built as a single Ruby application. It runs on a dedicated Arch Linux appliance (Framework Desktop) with full-disk encryption, local LLM inference via Ollama, voice input/output, and integrations with Telegram, Spotify, Google Workspace, Hue lights, Sonos, and Home Assistant.
+ErinOS is a local-first AI assistant built with Ruby. It runs on a dedicated Arch Linux appliance with full-disk encryption, local LLM inference via Ollama, voice input/output, and integrations with console, Telegram, and voice hardware. Erin's skills currently include Google Workspace, Home Assistant, Hue lights, Spotify, and Sonos.
 
 Everything runs locally. The only external dependency is an OAuth relay service that holds provider secrets so the appliance never needs them.
 
@@ -69,7 +69,7 @@ Channels are thin HTTP clients that use the shared `ErinosClient` (`services/eri
 
 **Console** (`channels/console.rb`): An interactive CLI. Authenticates with a PIN, then streams responses via SSE with a spinner that shows tool names as they execute.
 
-**Telegram** (`channels/telegram_bot.rb`): A long-polling Telegram bot. Unknown users are asked for their PIN to link their account. Supports both text and voice messages. Voice messages are downloaded as OGG, converted to WAV with ffmpeg, sent to `/api/voice`, and the audio response is sent back as a Telegram voice message.
+**Telegram** (`channels/telegram_bot.rb`): A long-polling Telegram bot. Unknown users are asked for their PIN to link their account. Supports both text and voice messages. Voice messages are downloaded as OGG, converted to WAV with ffmpeg, sent to `/api/chat`, and the audio response is sent back as a Telegram voice message.
 
 **Scheduler** (`bin/scheduler`): A polling loop that checks for due schedules every 30 seconds. When a schedule fires, it sends the prompt to `/api/chat` and delivers the response via the Notifier service (currently Telegram only).
 
@@ -124,7 +124,7 @@ The firmware flow is:
 
 1. On boot, connect to WiFi and initialize audio codecs via I2C. LEDs breathe white when idle.
 2. When the BOOT button is pressed, LEDs pulse pink and the mic records audio into a PSRAM buffer (16kHz, 16-bit, mono, up to 10 seconds).
-3. On button release, LEDs spin pink and the firmware builds a WAV file from the recorded PCM data, wraps it in a multipart HTTP POST, and sends it to `/api/voice` on the ErinOS server.
+3. On button release, LEDs spin pink and the firmware builds a WAV file from the recorded PCM data, wraps it in a multipart HTTP POST, and sends it to `/api/chat` on the ErinOS server.
 4. The server responds with WAV audio. The firmware strips the 44-byte WAV header and plays the raw PCM through the speaker. LEDs turn green during playback.
 5. When playback finishes, LEDs return to idle breathing.
 
@@ -298,15 +298,21 @@ The serial monitor shows WiFi connection status, recording events, HTTP requests
 
 ### OAuth Relay
 
-The OAuth relay is a separate Sinatra app. For development, you can run it locally:
+The OAuth relay is a separate Sinatra app that must be publicly accessible (OAuth providers redirect back to it). For development, expose it via ngrok or deploy it somewhere like Fly.io:
 
 ```bash
+# Deploy to Fly.io (production)
+cd oauth_relay
+fly launch
+
+# Or for development: run locally + expose via ngrok
 cd oauth_relay
 bundle install
 ruby app.rb
+ngrok http 9292   # in another terminal
 ```
 
-Set `OAUTH_RELAY_URL=http://localhost:9292` in your `.env` to point to the local relay. In production, it runs on Fly.io at `https://oauth.erinos.ai`.
+Set `OAUTH_RELAY_URL` in your `.env` to the public URL (e.g. `https://oauth.erinos.ai` or your ngrok URL). It cannot be localhost — OAuth providers need to redirect back to a reachable address.
 
 Provider OAuth credentials (client ID and secret) go in the relay's environment, not in the appliance's `.env`.
 
@@ -386,9 +392,9 @@ It will:
 
 You need the GitHub CLI (`gh`) installed and authenticated.
 
-### Installing on the Framework Desktop
+### Installing on the appliance
 
-1. Plug the USB drive into the Framework Desktop
+1. Plug the USB drive into the appliance
 2. Boot from USB (press F12 for boot menu)
 3. At the motd prompt, run `erinos-install`
 4. Follow the 7-step installer
