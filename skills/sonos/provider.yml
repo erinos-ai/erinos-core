@@ -1,4 +1,0 @@
-auth:
-  type: oauth
-env:
-  SONOS_ACCESS_TOKEN: access_token

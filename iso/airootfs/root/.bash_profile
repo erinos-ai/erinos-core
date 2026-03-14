@@ -1,2 +1,0 @@
-clear
-cat /etc/motd

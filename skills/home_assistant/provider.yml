@@ -1,5 +1,0 @@
-auth:
-  type: local
-env:
-  HA_URL: url
-  HA_TOKEN: token
