@@ -35,40 +35,8 @@ if [[ "$ERIN_PROVIDER" == "ollama" && -n "$ERIN_MODEL" ]]; then
 
   export OLLAMA_MAX_PARALLEL_DOWNLOADS="${OLLAMA_MAX_PARALLEL_DOWNLOADS:-2}"
 
-  PULL_STATUS="/tmp/ollama-pull-status"
-  START=$SECONDS
-  for attempt in $(seq 1 5); do
-    progress "Downloading ${ERIN_MODEL} (attempt ${attempt}/5)..."
-
-    # Run ollama pull synchronously in a subshell with a 30-minute timeout.
-    # Progress is captured via a background monitor.
-    set +e
-    timeout 1800 ollama pull "$ERIN_MODEL" 2>&1 | tee -a "$LOG" > "$PULL_STATUS" &
-    PID=$!
-    while kill -0 $PID 2>/dev/null; do
-      ELAPSED=$(( SECONDS - START ))
-      TIMESTAMP=$(printf '%dm%02ds' $((ELAPSED/60)) $((ELAPSED%60)))
-      DETAIL=$(tr -d '\r' < "$PULL_STATUS" 2>/dev/null | grep -oE '[0-9]+%.*' | tail -1 || true)
-      if [[ -n "$DETAIL" ]]; then
-        progress "Downloading ${ERIN_MODEL}: ${DETAIL} [${TIMESTAMP}]"
-      else
-        progress "Downloading ${ERIN_MODEL}... [${TIMESTAMP}]"
-      fi
-      sleep 3
-    done
-    wait $PID
-    PULL_EXIT=$?
-    set -e
-
-    # Verify the model is actually available, not just that the command exited
-    if [[ $PULL_EXIT -eq 0 ]] && ollama list 2>/dev/null | grep -q "$(echo "$ERIN_MODEL" | cut -d: -f1)"; then
-      break
-    fi
-
-    echo "Attempt ${attempt} failed (exit=$PULL_EXIT), retrying in 15s..." >> "$LOG"
-    sleep 15
-  done
-  rm -f "$PULL_STATUS"
+  progress "Downloading ${ERIN_MODEL}..."
+  ollama pull "$ERIN_MODEL" >> "$LOG" 2>&1
 fi
 
 # ── Download Whisper model ───────────────────────────────────────────
