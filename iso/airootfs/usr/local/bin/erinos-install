@@ -422,12 +422,12 @@ FIRSTBOOT
 sed -i 's/^hosts:.*/hosts: mymachines mdns_minimal [NOTFOUND=return] resolve [!UNAVAIL=return] files dns/' /etc/nsswitch.conf
 
 # Ollama systemd override: read settings from .env, default to 2 parallel downloads
-OLLAMA_PARALLEL=$(grep '^OLLAMA_MAX_PARALLEL_DOWNLOADS=' /opt/erinos/.env 2>/dev/null | cut -d= -f2)
-OLLAMA_PARALLEL="${OLLAMA_PARALLEL:-2}"
+OLLAMA_PARALLEL=\$(grep '^OLLAMA_MAX_PARALLEL_DOWNLOADS=' /opt/erinos/.env 2>/dev/null | cut -d= -f2)
+OLLAMA_PARALLEL="\${OLLAMA_PARALLEL:-2}"
 mkdir -p /etc/systemd/system/ollama.service.d
 cat > /etc/systemd/system/ollama.service.d/override.conf <<EOF
 [Service]
-Environment="OLLAMA_MAX_PARALLEL_DOWNLOADS=${OLLAMA_PARALLEL}"
+Environment="OLLAMA_MAX_PARALLEL_DOWNLOADS=\${OLLAMA_PARALLEL}"
 EOF
 
 # Enable boot services
