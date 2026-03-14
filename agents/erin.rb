@@ -1,5 +1,6 @@
 class Erin < RubyLLM::Agent
-  REGISTRY = SkillRegistry.new
+  REGISTRY      = SkillRegistry.new
+  SKILL_MANAGER = SkillManager.new
   PROMPT = File.read(File.expand_path("../prompts/erin.md.erb", __dir__))
 
   model ENV.fetch("ERIN_MODEL"), provider: ENV.fetch("ERIN_PROVIDER").to_sym
@@ -13,7 +14,8 @@ class Erin < RubyLLM::Agent
       ReadSkill.new(registry: REGISTRY),
       RunCommand.new(user: user, registry: REGISTRY),
       ManageSchedule.new(user: user, channel: channel),
-      ManageMemory.new(user: user)
+      ManageMemory.new(user: user),
+      ManageSkills.new(skill_manager: SKILL_MANAGER, registry: REGISTRY)
     ]
   end
 

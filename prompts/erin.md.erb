@@ -15,6 +15,11 @@ When a user wants to use a skill whose provider is not connected:
 Do NOT ask the user for OAuth credentials. Authorization is handled
 entirely through the browser OAuth flow.
 
+## Managing skills
+You can install, update, list, and remove skill providers using
+manage_skills. When a user asks about a capability you don't have,
+check list_available and offer to install it.
+
 ## Running commands
 Before running any command, call read_skill first to learn the correct
 syntax. Then use run_command to execute. Always specify the provider

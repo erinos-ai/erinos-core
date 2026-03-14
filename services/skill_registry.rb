@@ -5,8 +5,15 @@ class SkillRegistry
     def shared? = name.end_with?("-shared")
   end
 
-  def initialize(skills_dir: File.expand_path("../skills", __dir__))
+  DEFAULT_DIR = File.expand_path("~/.erinos/skills")
+
+  def initialize(skills_dir: ENV.fetch("SKILLS_DIR", DEFAULT_DIR))
     @skills_dir = skills_dir
+    @skills = {}
+    load_all
+  end
+
+  def reload!
     @skills = {}
     load_all
   end
@@ -51,6 +58,8 @@ class SkillRegistry
   end
 
   def load_all
+    return unless Dir.exist?(@skills_dir)
+
     Dir[File.join(@skills_dir, "*/provider.yml")].each do |provider_path|
       provider_dir = File.dirname(provider_path)
       provider_name = File.basename(provider_dir)

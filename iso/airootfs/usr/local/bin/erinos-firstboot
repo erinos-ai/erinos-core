@@ -72,6 +72,15 @@ fi
 progress "Initializing database..."
 su erinos -s /bin/bash -c 'export PATH="/opt/erinos/.rbenv/bin:/opt/erinos/.rbenv/shims:$PATH" && cd /opt/erinos && bundle exec bin/erinos db:reset' >>"$LOG" 2>&1
 
+# ── Install default skills ────────────────────────────────────────────
+DEFAULT_SKILLS="${DEFAULT_SKILLS:-google}"
+progress "Installing skills..."
+IFS=',' read -ra SKILL_LIST <<< "$DEFAULT_SKILLS"
+for skill in "${SKILL_LIST[@]}"; do
+  skill=$(echo "$skill" | xargs)
+  su erinos -s /bin/bash -c "export PATH=\"/opt/erinos/.rbenv/bin:/opt/erinos/.rbenv/shims:\$PATH\" && cd /opt/erinos && bundle exec ruby -e \"require_relative 'config/application'; SkillManager.new.install('$skill')\"" >>"$LOG" 2>&1 || true
+done
+
 # ── Start application services ───────────────────────────────────────
 if [[ -f "$ENV_FILE" ]]; then
   progress "Starting services..."
