@@ -97,6 +97,7 @@ GEM
       rack (>= 3.0.0)
     rackup (2.3.1)
       rack (>= 3)
+    rake (13.3.1)
     ruby2_keywords (0.0.5)
     ruby_llm (1.13.2)
       base64
@@ -145,6 +146,7 @@ DEPENDENCIES
   fugit
   puma
   rackup
+  rake
   ruby_llm
   sinatra
   sqlite3
@@ -192,6 +194,7 @@ CHECKSUMS
   rack-protection (4.2.1) sha256=cf6e2842df8c55f5e4d1a4be015e603e19e9bc3a7178bae58949ccbb58558bac
   rack-session (2.1.1) sha256=0b6dc07dea7e4b583f58a48e8b806d4c9f1c6c9214ebc202ec94562cbea2e4e9
   rackup (2.3.1) sha256=6c79c26753778e90983761d677a48937ee3192b3ffef6bc963c0950f94688868
+  rake (13.3.1) sha256=8c9e89d09f66a26a01264e7e3480ec0607f0c497a861ef16063604b1b08eb19c
   ruby2_keywords (0.0.5) sha256=ffd13740c573b7301cf7a2e61fc857b2a8e3d3aff32545d6f8300d8bae10e3ef
   ruby_llm (1.13.2) sha256=f8bd7fa0e3c486368b318167775eac086896e3477986ad5ca2c3b38b1e2913c5
   ruby_llm-schema (0.3.0) sha256=a591edc5ca1b7f0304f0e2261de61ba4b3bea17be09f5cf7558153adfda3dec6
