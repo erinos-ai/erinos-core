@@ -1,0 +1,137 @@
+#!/usr/bin/env bash
+# Self-update ErinOS from GitHub releases.
+# Usage: erinos update [VERSION]
+#   erinos update          # update to latest release
+#   erinos update v1.2.0   # update to specific version
+set -euo pipefail
+
+REPO="erinos-ai/erinos-core"
+APP_DIR="/opt/erinos"
+RBENV_PATH="$APP_DIR/.rbenv/bin:$APP_DIR/.rbenv/shims"
+SERVICES=(erinos-server erinos-telegram erinos-scheduler erinos-tunnel)
+
+# Colors
+GREEN='\033[38;5;82m'
+YELLOW='\033[38;5;11m'
+RED='\033[38;5;196m'
+PINK='\033[38;5;13m'
+DIM='\033[38;5;245m'
+RST='\033[0m'
+
+ok()   { printf "  ${GREEN}✓${RST} %s\n" "$1"; }
+warn() { printf "  ${YELLOW}!${RST} %s\n" "$1"; }
+fail() { printf "  ${RED}✗${RST} %s\n" "$1"; exit 1; }
+
+# ── Determine target version ──────────────────────────────────────────
+TARGET="${1:-}"
+
+if [[ -z "$TARGET" ]]; then
+  printf "${PINK}Checking for updates...${RST}\n"
+  TARGET=$(curl -sf "https://api.github.com/repos/$REPO/releases/latest" \
+    | grep '"tag_name"' | head -1 | cut -d'"' -f4) \
+    || fail "Could not reach GitHub. Check your internet connection."
+fi
+
+[[ -z "$TARGET" ]] && fail "No releases found."
+
+# ── Compare with current version ──────────────────────────────────────
+CURRENT=""
+[[ -f "$APP_DIR/VERSION" ]] && CURRENT=$(cat "$APP_DIR/VERSION")
+
+if [[ "$CURRENT" == "$TARGET" ]]; then
+  ok "Already on $TARGET — nothing to do."
+  exit 0
+fi
+
+if [[ -n "$CURRENT" ]]; then
+  printf "  ${DIM}Current: ${RST}%s\n" "$CURRENT"
+fi
+printf "  ${DIM}Target:  ${RST}%s\n" "$TARGET"
+echo ""
+
+# ── Download release tarball ──────────────────────────────────────────
+printf "${PINK}Downloading %s...${RST}\n" "$TARGET"
+
+TMPDIR=$(mktemp -d)
+trap 'rm -rf "$TMPDIR"' EXIT
+
+TARBALL_URL="https://github.com/$REPO/archive/refs/tags/$TARGET.tar.gz"
+if ! curl -sfL "$TARBALL_URL" -o "$TMPDIR/release.tar.gz"; then
+  fail "Failed to download $TARGET. Does the tag exist?"
+fi
+
+tar xzf "$TMPDIR/release.tar.gz" -C "$TMPDIR" --strip-components=1
+ok "Downloaded"
+
+# ── Back up current version ───────────────────────────────────────────
+BACKUP="$APP_DIR/.update-backup"
+rm -rf "$BACKUP"
+mkdir -p "$BACKUP"
+
+# Save files we need to preserve across updates
+for keep in .env db vendor .rbenv .bash_profile .onboard-done models; do
+  [[ -e "$APP_DIR/$keep" ]] && cp -a "$APP_DIR/$keep" "$BACKUP/$keep"
+done
+[[ -n "$CURRENT" ]] && echo "$CURRENT" > "$BACKUP/PREVIOUS_VERSION"
+ok "Backed up current state"
+
+# ── Replace application files ─────────────────────────────────────────
+printf "${PINK}Installing...${RST}\n"
+
+# Remove old app files (but not data/config we backed up)
+find "$APP_DIR" -mindepth 1 -maxdepth 1 \
+  ! -name '.env' ! -name 'db' ! -name 'vendor' \
+  ! -name '.rbenv' ! -name '.bash_profile' ! -name '.onboard-done' \
+  ! -name 'models' ! -name '.update-backup' \
+  -exec rm -rf {} +
+
+# Copy new files
+cp -a "$TMPDIR"/. "$APP_DIR/"
+chmod +x "$APP_DIR/bin/"*
+
+# Restore preserved files over any defaults
+for keep in .env db vendor .rbenv .bash_profile .onboard-done models; do
+  [[ -e "$BACKUP/$keep" ]] && cp -a "$BACKUP/$keep" "$APP_DIR/$keep"
+done
+
+# Write version marker
+echo "$TARGET" > "$APP_DIR/VERSION"
+chown -R erinos: "$APP_DIR"
+ok "Files updated"
+
+# ── Bundle install ────────────────────────────────────────────────────
+printf "${PINK}Installing dependencies...${RST}\n"
+su erinos -s /bin/bash -c "
+  export PATH=\"$RBENV_PATH:\$PATH\"
+  cd $APP_DIR
+  bundle config set --local path vendor/bundle
+  bundle install --quiet
+" || fail "bundle install failed"
+ok "Dependencies installed"
+
+# ── Run migrations ────────────────────────────────────────────────────
+printf "${PINK}Running migrations...${RST}\n"
+su erinos -s /bin/bash -c "
+  export PATH=\"$RBENV_PATH:\$PATH\"
+  cd $APP_DIR
+  bundle exec rake db:migrate
+" 2>/dev/null || warn "No pending migrations"
+ok "Database up to date"
+
+# ── Restart services ──────────────────────────────────────────────────
+printf "${PINK}Restarting services...${RST}\n"
+for svc in "${SERVICES[@]}"; do
+  if systemctl is-enabled "$svc" &>/dev/null; then
+    systemctl restart "$svc"
+  fi
+done
+ok "Services restarted"
+
+# ── Done ──────────────────────────────────────────────────────────────
+echo ""
+printf "${GREEN}Updated to %s${RST}\n" "$TARGET"
+
+if [[ -f "$BACKUP/PREVIOUS_VERSION" ]]; then
+  PREV=$(cat "$BACKUP/PREVIOUS_VERSION")
+  printf "${DIM}Previous version backed up. To rollback: erinos update %s${RST}\n" "$PREV"
+fi

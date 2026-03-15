@@ -1,0 +1,23 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+case ARGV[0]
+when "server"
+  load File.expand_path("server", __dir__)
+when "telegram"
+  load File.expand_path("telegram", __dir__)
+when "scheduler"
+  load File.expand_path("scheduler", __dir__)
+when "tunnel"
+  load File.expand_path("tunnel", __dir__)
+when "console"
+  load File.expand_path("console", __dir__)
+when "update"
+  exec File.expand_path("erinos-update", __dir__), *ARGV[1..]
+when "version"
+  version_file = File.expand_path("../VERSION", __dir__)
+  puts File.exist?(version_file) ? File.read(version_file).strip : "dev"
+else
+  warn "Usage: erinos <server|console|telegram|scheduler|tunnel|update|version>"
+  exit 1
+end

@@ -24,8 +24,9 @@ tools/                Agent tools (OAuth, commands, schedules, memory)
 entities/             ActiveRecord models (User, Memory, Schedule, UserCredential)
 config/               Application boot and initializers
 db/                   Migrations and seeds
-bin/                  Process entrypoints (server, console, telegram, scheduler)
-dev/                  Development tools (Procfile, start script, USB flash script)
+bin/                  CLI entrypoint and process scripts
+dev/                  Development tools (Procfile, start script)
+VERSION               Current version tag (stamped by CI on release)
 ```
 
 
@@ -82,6 +83,62 @@ The `SkillRegistry` loads all installed skills at boot. Erin sees them in her ca
 ### Database
 
 SQLite at `db/data/erinos.sqlite3`. Four tables: `users`, `user_credentials`, `schedules`, `memories`.
+
+
+## CLI
+
+On the appliance, `erinos` is the main entry point for all commands:
+
+```bash
+erinos server       # Start the API server
+erinos console      # Interactive chat console
+erinos telegram     # Telegram bot
+erinos scheduler    # Scheduled task runner
+erinos tunnel       # WebSocket tunnel to relay
+erinos update       # Update to the latest release
+erinos update v1.2  # Update to a specific version
+erinos version      # Show current version
+```
+
+The CLI dispatcher (`bin/erinos`) routes subcommands to their respective scripts in `bin/`.
+
+
+## Updating
+
+The appliance can self-update from GitHub releases:
+
+```bash
+erinos update
+```
+
+This will:
+
+1. Check GitHub for the latest release of erinos-core
+2. Download the release tarball
+3. Preserve local data (`.env`, database, vendor, rbenv, models)
+4. Replace application files
+5. Run `bundle install` and database migrations
+6. Restart all services
+
+To update to a specific version:
+
+```bash
+erinos update v1.2.0
+```
+
+To rollback, update to the previous version (shown after each update).
+
+
+## Releasing
+
+Tag a new version on erinos-core to create a release:
+
+```bash
+git tag v1.1.0
+git push --tags
+```
+
+GitHub Actions creates a release automatically. Appliances can then pull it with `erinos update`.
 
 
 ## Development Setup
