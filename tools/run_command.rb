@@ -45,6 +45,8 @@ class RunCommand < RubyLLM::Tool
     return "Unknown provider: #{provider}" if skills.empty?
 
     skill = skills.first
+    return nil if skill.env.empty?
+
     credential = @user.user_credentials.find_by(provider: provider)
     return "No #{provider} credentials found. Ask the user to connect their #{provider} account first." unless credential
 
