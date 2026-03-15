@@ -14,6 +14,11 @@ when "console"
   load File.expand_path("console", __dir__)
 when "update"
   exec File.expand_path("erinos-update", __dir__), *ARGV[1..]
+when /^db:/
+  require "rake"
+  Rake.application.init
+  Rake.application.load_rakefile
+  Rake.application[ARGV[0]].invoke
 when "version"
   version_file = File.expand_path("../VERSION", __dir__)
   puts File.exist?(version_file) ? File.read(version_file).strip : "dev"
