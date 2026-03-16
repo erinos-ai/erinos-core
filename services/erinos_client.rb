@@ -24,7 +24,7 @@ class ErinosClient
     req["X-User-ID"] = @user_id
     req.body = JSON.generate(message: message)
 
-    Net::HTTP.start(uri.hostname, uri.port) do |http|
+    Net::HTTP.start(uri.hostname, uri.port, read_timeout: 300) do |http|
       http.request(req) do |response|
         unless response.code == "200"
           body = JSON.parse(response.body) rescue {}
