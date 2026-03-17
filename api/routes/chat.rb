@@ -4,6 +4,21 @@ module Routes
       app.post "/api/chat" do
         user = current_user
         text = extract_message
+
+        # Intercept slash commands before the LLM
+        if SlashCommands.match?(text)
+          result = SlashCommands.dispatch(text, user: user)
+          if result
+            handler, args = result
+            content = handler.execute(args)
+            return json(response: content)
+          else
+            return json(response: "Unknown command. Type `/help` for available commands.")
+          end
+        end
+
+        return json(response: NO_MODEL_MESSAGE) unless model_configured?
+
         chat = chat_for(user)
         response = chat.ask(text)
         respond_with(response.content)
@@ -17,10 +32,39 @@ module Routes
         message = body["message"]
         halt 400, json(error: "message required") unless message&.strip&.length&.positive?
 
-        chat = chat_for(user)
-
         content_type "text/event-stream"
         headers "Cache-Control" => "no-cache"
+
+        # Intercept slash commands before the LLM
+        if SlashCommands.match?(message)
+          result = SlashCommands.dispatch(message, user: user)
+          if result
+            handler, args = result
+            stream(:keep_open) do |out|
+              handler.execute_stream(args, out)
+              out << "event: done\ndata: {}\n\n"
+              out.close
+            end
+          else
+            stream(:keep_open) do |out|
+              out << "event: token\ndata: #{JSON.generate(content: "Unknown command. Type `/help` for available commands.\n")}\n\n"
+              out << "event: done\ndata: {}\n\n"
+              out.close
+            end
+          end
+          return
+        end
+
+        unless model_configured?
+          stream(:keep_open) do |out|
+            out << "event: token\ndata: #{JSON.generate(content: NO_MODEL_MESSAGE)}\n\n"
+            out << "event: done\ndata: {}\n\n"
+            out.close
+          end
+          return
+        end
+
+        chat = chat_for(user)
 
         stream(:keep_open) do |out|
           chat.on_tool_call do |tool_call|
@@ -41,6 +85,23 @@ module Routes
       end
 
       app.helpers do
+        NO_MODEL_MESSAGE = <<~MD.freeze
+          Hi! I'm not connected to a language model yet.
+
+          To get started, download and activate a model:
+
+          1. `/model pull <name>` — download a model (e.g. `qwen3:8b`)
+          2. `/model switch <name>` — activate it
+          3. `/model list` — see downloaded models
+
+          Once a model is active, I'll be ready to chat!
+        MD
+
+        def model_configured?
+          model = ENV.fetch("ERIN_MODEL", "")
+          !model.empty?
+        end
+
         def extract_message
           if params[:file]
             text = transcribe(params[:file][:tempfile])
