@@ -3,7 +3,7 @@ class Erin < RubyLLM::Agent
   SKILL_MANAGER = SkillManager.new
   PROMPT = File.read(File.expand_path("../prompts/erin.md.erb", __dir__))
 
-  model ENV.fetch("ERIN_MODEL", ""), provider: ENV.fetch("ERIN_PROVIDER", "ollama").to_sym
+  model ENV.fetch("ERIN_MODEL"), provider: ENV.fetch("ERIN_PROVIDER").to_sym
   inputs :user, :channel
 
   tools do

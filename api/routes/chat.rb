@@ -17,8 +17,6 @@ module Routes
           end
         end
 
-        return json(response: NO_MODEL_MESSAGE) unless model_configured?
-
         chat = chat_for(user)
         response = chat.ask(text)
         respond_with(response.content)
@@ -55,15 +53,6 @@ module Routes
           return
         end
 
-        unless model_configured?
-          stream(:keep_open) do |out|
-            out << "event: token\ndata: #{JSON.generate(content: NO_MODEL_MESSAGE)}\n\n"
-            out << "event: done\ndata: {}\n\n"
-            out.close
-          end
-          return
-        end
-
         chat = chat_for(user)
 
         stream(:keep_open) do |out|
@@ -85,23 +74,6 @@ module Routes
       end
 
       app.helpers do
-        NO_MODEL_MESSAGE = <<~MD.freeze
-          Hi! I'm not connected to a language model yet.
-
-          To get started, download and activate a model:
-
-          1. `/model pull <name>` — download a model (e.g. `qwen3:8b`)
-          2. `/model switch <name>` — activate it
-          3. `/model list` — see downloaded models
-
-          Once a model is active, I'll be ready to chat!
-        MD
-
-        def model_configured?
-          model = ENV.fetch("ERIN_MODEL", "")
-          !model.empty?
-        end
-
         def extract_message
           if params[:file]
             text = transcribe(params[:file][:tempfile])
