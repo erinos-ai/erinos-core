@@ -103,6 +103,9 @@ class Console
   rescue Errno::ECONNREFUSED
     @spinner&.kill
     puts "\r\e[K\e[31mCannot connect to server.\e[0m\n\n"
+  rescue EOFError
+    @spinner&.kill
+    puts "\r\e[K\e[31mConnection lost.\e[0m\n\n"
   end
 
   def start_spinner
