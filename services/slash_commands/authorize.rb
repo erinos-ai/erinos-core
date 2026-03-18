@@ -47,6 +47,9 @@ module SlashCommands
         "token_expires_at" => (Time.now + tokens["expires_in"].to_i).iso8601
       })
 
+      # Clear cached chat so Erin picks up the new credentials
+      App::CHAT_MUTEX.synchronize { App::CHATS.delete(@user.id) }
+
       emit_token(out, "**#{provider.capitalize}** connected successfully!\n")
     rescue => e
       emit_token(out, "Error: #{e.message}\n")
