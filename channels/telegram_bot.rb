@@ -76,7 +76,7 @@ class TelegramBot
 
     # Send placeholder message that we'll edit as tokens arrive
     sent = bot.api.send_message(chat_id: message.chat.id, text: "...")
-    message_id = sent.dig("result", "message_id")
+    message_id = sent.is_a?(Hash) ? sent.dig("result", "message_id") : sent&.message_id
 
     current_text = ""
     last_edit = Time.now
@@ -90,7 +90,7 @@ class TelegramBot
         if current_text.length > 4000
           edit_message(bot, message.chat.id, message_id, current_text)
           sent = bot.api.send_message(chat_id: message.chat.id, text: "...")
-          message_id = sent.dig("result", "message_id")
+          message_id = sent.is_a?(Hash) ? sent.dig("result", "message_id") : sent&.message_id
           current_text = ""
           last_edit = Time.now
         elsif Time.now - last_edit >= 1.0
