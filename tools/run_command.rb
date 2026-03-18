@@ -30,7 +30,7 @@ class RunCommand < RubyLLM::Tool
       .map { |s| File.join(File.dirname(s.path), "scripts") }
       .select { |d| Dir.exist?(d) }
       .uniq
-    env["PATH"] = (skill_paths + [ENV["PATH"]]).join(":")
+    env["PATH"] = (skill_paths + [BIN_DIR, ENV["PATH"]]).join(":")
 
     output, status = Open3.capture2e(env, command)
     status.success? ? output : "Command failed (exit #{status.exitstatus}):\n#{output}"

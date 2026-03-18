@@ -16,6 +16,7 @@ loader.setup
 Dir[File.expand_path("initializers/**/*.rb", __dir__)].each { |f| require f }
 
 RELAY_URL = ENV.fetch("RELAY_URL", "https://relay.erinos.ai")
+BIN_DIR = File.expand_path("~/.local/bin").tap { |d| FileUtils.mkdir_p(d) }
 
 ActiveRecord::Base.establish_connection(
   adapter: "sqlite3",

@@ -94,7 +94,8 @@ module SlashCommands
       emit_token(out, "\nRunning setup for **#{provider}**...\n\n")
       emit_progress(out, "running setup")
 
-      Open3.popen2e(setup_script, provider_dir) do |_stdin, stdout_err, wait_thr|
+      env = { "BIN_DIR" => BIN_DIR }
+      Open3.popen2e(env, setup_script, provider_dir) do |_stdin, stdout_err, wait_thr|
         stdout_err.each_line do |line|
           emit_token(out, line)
         end
