@@ -8,18 +8,19 @@ class Erin < RubyLLM::Agent
 
   tools do
     [
-      AuthorizeProvider.new(user: user, registry: REGISTRY),
-      CheckAuthorization.new(user: user),
       StoreCredential.new(user: user),
       ReadSkill.new(registry: REGISTRY),
       RunCommand.new(user: user, registry: REGISTRY),
       ManageSchedule.new(user: user, channel: channel),
-      ManageMemory.new(user: user),
-      ManageSkills.new(skill_manager: SKILL_MANAGER, registry: REGISTRY)
+      ManageMemory.new(user: user)
     ]
   end
 
   instructions do
+    self.class.render_instructions(user: user)
+  end
+
+  def self.render_instructions(user:)
     connected = user.user_credentials.pluck(:provider)
     memories = user.memories.order(:created_at).pluck(:id, :content)
     memories_text = if memories.empty?

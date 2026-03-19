@@ -23,6 +23,8 @@ class App < Sinatra::Base
     def chat_for(user)
       CHAT_MUTEX.synchronize do
         CHATS[user.id] ||= Erin.chat(user: user, channel: "api")
+      end.tap do |chat|
+        chat.with_instructions(Erin.render_instructions(user: user))
       end
     end
 
