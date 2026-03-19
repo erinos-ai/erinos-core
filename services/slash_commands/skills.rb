@@ -57,12 +57,12 @@ module SlashCommands
 
       emit_progress(out, "installing #{name}")
       result = skill_manager.install(name)
-      emit_token(out, "#{result}\n")
 
-      # Run setup script if present
+      # Run setup script if present (before reporting success)
       run_setup_script(name, out)
 
       Erin::REGISTRY.reload!
+      emit_token(out, "#{result}\n")
     end
 
     def update_skills(out)
